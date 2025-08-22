@@ -150,4 +150,4 @@ If you want to build the binary yourself, you can do so with PyInstaller.
 3. **Build the binary:**  
    pyinstaller \--onefile \--name PCDdebugger pcddebugger.py
 
-The final executable will be located in the dist/ directory.
+The final executable will be located in the dist/ directory.# PCDDebugger
