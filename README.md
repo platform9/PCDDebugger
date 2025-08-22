@@ -1,4 +1,4 @@
-# **PCD & Kubernetes Diagnostic Collector (PCDdebugger)**
+# **PCDdebugger**
 
 PCDdebugger is a command-line tool designed to simplify and accelerate the troubleshooting process for PCD environments. It automates the collection of diagnostic information for various services and resources, consolidating the output into a structured directory for easy analysis and sharing.
 
