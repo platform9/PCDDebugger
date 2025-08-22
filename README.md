@@ -15,7 +15,7 @@ PCDdebugger is a command-line Python script designed to simplify and accelerate 
 Before running the script, ensure the following are installed and configured on your machine:
 
 * **Python 3.6+**  
-* **pcd client:** Authenticated and configured to connect to your pCD cloud. (Ensure your rc file is sourced).  
+* **pcd client:** Authenticated and configured to connect to your PCD cloud. (Ensure your rc file is sourced).  
 * **kubectl:** Authenticated and configured to connect to your Kubernetes cluster.  
 * **yq:** A command-line YAML processor, used for parsing data from Consul.
 
