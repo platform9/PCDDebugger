@@ -10,7 +10,7 @@ import shutil
 import re
 import gzip
 
-DEFAULT_OUTPUT_DIR = f"openstack-debug-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+DEFAULT_OUTPUT_DIR = f"PCDdebug-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 OUTPUT_DIR = DEFAULT_OUTPUT_DIR
 
 def run_cmd(cmd, shell=False):
