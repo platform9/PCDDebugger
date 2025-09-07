@@ -1,82 +1,99 @@
 name: Create Release and Upload Binaries
 
-# This workflow runs ONLY when a new tag is pushed that starts with "v" (e.g., v1.0, v1.2.3)
 on:
   push:
     tags:
       - 'v*'
 
 jobs:
-  build-and-upload:
+  build-linux:
+    name: Build for Linux
+    runs-on: ubuntu-latest
+    
+    # This block tells GitHub to run all steps inside an ubuntu:20.04 Docker container
+    container:
+      image: ubuntu:20.04
+      
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Prepare container environment
+        run: |
+          apt-get update
+          # Install software-properties-common to get add-apt-repository
+          apt-get install -y software-properties-common
+          # Add the deadsnakes PPA for newer Python versions
+          add-apt-repository ppa:deadsnakes/ppa -y
+          # Install Python 3.11 and pip
+          apt-get install -y python3.11 python3-pip
+          
+      - name: Install dependencies
+        run: pip3 install -r requirements.txt
+        
+      - name: Build with PyInstaller
+        run: |
+          export ARTIFACT_NAME=PCDdebugger-${{ github.ref_name }}-linux
+          pyinstaller --onefile --name "${ARTIFACT_NAME}" PCDdebugger.py
+          
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCDdebugger-${{ github.ref_name }}-linux
+          path: dist/PCDdebugger-${{ github.ref_name }}-linux
+
+  build-macos-windows:
     name: Build for ${{ matrix.os }}
-    # Use a matrix strategy to build on all 3 operating systems
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-latest, windows-latest]
-
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-
     steps:
-    # 1. Check out the repository's code
-    - name: Check out code
-      uses: actions/checkout@v4
-
-    # 2. Set up the Python environment
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    # 3. Install your project's dependencies
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    # 4. Determine the output name based on the OS
-    - name: Set artifact name
-      run: |
-        if [ "${{ runner.os }}" == "Windows" ]; then
-          echo "ARTIFACT_NAME=PCDdebugger-${{ github.ref_name }}-windows.exe" >> $GITHUB_ENV
-        elif [ "${{ runner.os }}" == "macOS" ]; then
-          echo "ARTIFACT_NAME=PCDdebugger-${{ github.ref_name }}-macos" >> $GITHUB_ENV
-        else
-          echo "ARTIFACT_NAME=PCDdebugger-${{ github.ref_name }}-linux" >> $GITHUB_ENV
-        fi
-      shell: bash
-
-    # 5. Build the executable using PyInstaller
-    - name: Build with PyInstaller
-      run: pyinstaller --onefile --name "${{ env.ARTIFACT_NAME }}" PCDdebugger.py
-
-    # 6. Upload the executable as a build artifact (for the release job)
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.ARTIFACT_NAME }}
-        path: dist/${{ env.ARTIFACT_NAME }}* # Use wildcard for .exe on Windows
+      - name: Check out code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Set artifact name
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            echo "ARTIFACT_NAME=PCDdebugger-${{ github.ref_name }}-windows.exe" >> $GITHUB_ENV
+          else
+            echo "ARTIFACT_NAME=PCDdebugger-${{ github.ref_name }}-macos" >> $GITHUB_ENV
+          fi
+        shell: bash
+        
+      - name: Build with PyInstaller
+        run: pyinstaller --onefile --name "${{ env.ARTIFACT_NAME }}" PCDdebugger.py
+        
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: dist/${{ env.ARTIFACT_NAME }}*
 
   create-release:
     name: Create GitHub Release
-    # This job depends on the build jobs completing successfully
-    needs: build-and-upload
-    runs-on: ubuntu-20.04
-
+    needs: [build-linux, build-macos-windows]
+    runs-on: ubuntu-latest
     steps:
-    # 1. Download all the build artifacts (the executables) from the previous jobs
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts/
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
 
-    # 2. Create the GitHub Release and upload the binaries
-    - name: Create Release and Upload Assets
-      uses: softprops/action-gh-release@v1
-      with:
-        # This will create a release with the same name as the tag (e.g., v1.0.0)
-        tag_name: ${{ github.ref }}
-        # This uses the commit message of the tag for the release notes
-        generate_release_notes: true
-        # Upload all files from the 'artifacts' directory
-        files: |
-          artifacts/**/*
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          generate_release_notes: true
+          files: |
+            artifacts/**/*
