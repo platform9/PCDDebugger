@@ -5,10 +5,11 @@ import subprocess
 import os
 import json
 import ast
-from datetime import datetime, timezone
+from datetime import datetime
 import shutil
 import re
 import gzip
+import yaml
 
 DEFAULT_OUTPUT_DIR = f"PCDdebugger-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 OUTPUT_DIR = DEFAULT_OUTPUT_DIR
@@ -243,23 +244,40 @@ def archive_output():
     print(f"[DONE] Output archived at: {zip_path}")
 
 def collect_mysql_dump(namespace, db_pod_label, db_service_name):
-    """Connects to a Percona HAProxy pod to perform a MySQL dump."""
+    """Connects to a Percona HAProxy pod to perform a MySQL dump, parsing Consul data with PyYAML."""
     print(f"[INFO] Starting MySQL dump for namespace: {namespace}")
     os.makedirs(f"{OUTPUT_DIR}/database", exist_ok=True)
 
     try:
-        print("[INFO] Fetching DB server name from consul...")
-        cmd_get_dbserver = f'kubectl exec deploy/resmgr -c resmgr -n {namespace} -- bash -l -c "consul-dump-yaml --start-key customers/\\$CUSTOMER_ID/regions/\\$REGION_ID/db | yq -r \'.customers.[\\$CUSTOMER_ID].regions.[\\$REGION_ID].dbserver\'"'
-        db_server, _ = run_cmd(cmd_get_dbserver, shell=True)
-        if "ERROR" in db_server or not db_server:
-            print("[ERROR] Could not determine DB server via resmgr/consul. Aborting MySQL dump.")
+        print("[INFO] Fetching DB configuration from consul...")
+        cmd_get_db_config = f'kubectl exec deploy/resmgr -c resmgr -n {namespace} -- bash -l -c "consul-dump-yaml --start-key customers/\\$CUSTOMER_ID/regions/\\$REGION_ID/db"'
+        db_config_yaml, _ = run_cmd(cmd_get_db_config, shell=True)
+        if "ERROR" in db_config_yaml:
+            print("[ERROR] Could not fetch DB config from resmgr/consul. Aborting.")
             return
 
-        print("[INFO] Fetching DB admin password from consul...")
-        cmd_get_dbpass = f'kubectl exec deploy/resmgr -c resmgr -n {namespace} -- bash -l -c "consul-dump-yaml --start-key customers/\\$CUSTOMER_ID/dbservers/{db_server} | yq -r \'.customers.[\\$CUSTOMER_ID].dbservers.\\"{db_server}\\".admin_pass\'"'
-        db_admin_pass, _ = run_cmd(cmd_get_dbpass, shell=True)
-        if "ERROR" in db_admin_pass or not db_admin_pass:
-            print("[ERROR] Could not determine DB admin password via resmgr/consul. Aborting MySQL dump.")
+        data = yaml.safe_load(db_config_yaml)
+        
+        customer_id = list(data['customers'].keys())[0]
+        region_id = list(data['customers'][customer_id]['regions'].keys())[0]
+        db_server = data['customers'][customer_id]['regions'][region_id]['dbserver']
+        
+        if not db_server:
+            print("[ERROR] Could not parse DB server name from Consul YAML. Aborting.")
+            return
+
+        print(f"[INFO] Found DB server: {db_server}. Fetching password...")
+        cmd_get_pass_config = f'kubectl exec deploy/resmgr -c resmgr -n {namespace} -- bash -l -c "consul-dump-yaml --start-key customers/\\$CUSTOMER_ID/dbservers/{db_server}"'
+        pass_config_yaml, _ = run_cmd(cmd_get_pass_config, shell=True)
+        if "ERROR" in pass_config_yaml:
+            print("[ERROR] Could not fetch DB password config from resmgr/consul. Aborting.")
+            return
+        
+        pass_data = yaml.safe_load(pass_config_yaml)
+        db_admin_pass = pass_data['customers'][customer_id]['dbservers'][db_server]['admin_pass']
+
+        if not db_admin_pass:
+            print("[ERROR] Could not parse DB admin password from Consul YAML. Aborting.")
             return
 
         print(f"[INFO] Finding a database pod using label: '{db_pod_label}'...")
@@ -292,10 +310,11 @@ def collect_mysql_dump(namespace, db_pod_label, db_service_name):
         save_binary(compressed_data, dump_filename)
         print(f"[OK] MySQL dump saved to {dump_filename}")
 
-    except subprocess.TimeoutExpired:
-        print("[ERROR] MySQL dump timed out after 30 minutes.")
+    except (subprocess.TimeoutExpired, yaml.YAMLError, KeyError, IndexError) as e:
+        print(f"[ERROR] An error occurred during the MySQL dump process: {e}")
+        print("[HINT] This could be due to a timeout, invalid YAML from Consul, or an unexpected data structure.")
     except Exception as e:
-        print(f"[ERROR] An unexpected error occurred during MySQL dump: {e}")
+        print(f"[ERROR] An unexpected error occurred: {e}")
 
 def main():
     global OUTPUT_DIR

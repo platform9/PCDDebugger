@@ -21,7 +21,6 @@ While the script itself is a standalone binary, it relies on the following comma
 
 * **openstack client**: Authenticated and configured to connect to your PCD cloud. (Ensure your rc file is sourced).  
 * **kubectl**: Authenticated and configured to connect to your Kubernetes cluster. (This is only required in case of a mysql dump).  
-* **yq**: A command-line YAML processor, used for parsing data from Consul.
 
 ---
 
