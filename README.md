@@ -29,7 +29,7 @@ While the script itself is a standalone binary, it relies on the following comma
 
 Download the correct binary for your operating system from the latest GitHub Release.
 
-[**➡️ Go to the Latest Releases Page**](https://www.google.com/search?q=https://github.com/platform9/PCDDebugger/releases/latest)
+[**➡️ Go to the Latest Releases Page**](https://github.com/platform9/PCDDebugger/releases/latest)
 
 ---
 
