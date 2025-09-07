@@ -14,10 +14,15 @@ DEFAULT_OUTPUT_DIR = f"PCDdebugger-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 OUTPUT_DIR = DEFAULT_OUTPUT_DIR
 
 def run_cmd(cmd, shell=False):
-    """Runs a command, adding --fit by default, and returns output and the command string."""
+    """Runs a command, adding --insecure and --fit to openstack commands, and returns output and the command string."""
     
-    # Automatically add --fit to relevant openstack commands
+    # Automatically add flags to openstack commands
     if isinstance(cmd, list) and cmd[0] == "openstack":
+        # Add --insecure to bypass SSL verification if not present
+        if "--insecure" not in cmd:
+            cmd.insert(1, "--insecure")
+        
+        # Add --fit to list/show commands for better formatting
         is_list_or_show = any(sub in ["list", "show"] for sub in cmd)
         if is_list_or_show and "--fit" not in cmd and "--fit-width" not in cmd:
             cmd.append("--fit")
@@ -189,10 +194,26 @@ def collect_image_and_flavor(vm_id):
     image_match = re.search(r'\(([^)]+)\)', image_id_str)
     image_id = image_match.group(1) if image_match else None
         
-    # Correctly fetch flavor ID
+    # --- START OF MODIFIED FLAVOR LOGIC ---
+    print("[INFO] Attempting to determine flavor ID...")
+    flavor_id = None
     flavor_id_str, _ = run_cmd(["openstack", "server", "show", vm_id, "-c", "flavor", "-f", "value"])
+
+    # Method 1: Try to find the ID in parentheses (e.g., "m1.small (flavor-id)")
     flavor_match = re.search(r'\(([^)]+)\)', flavor_id_str)
-    flavor_id = flavor_match.group(1) if flavor_match else None
+    if flavor_match:
+        flavor_id = flavor_match.group(1)
+        print(f"[INFO] Found flavor ID '{flavor_id}' using regex match.")
+    # Method 2: If regex fails, try to parse it as a dictionary string
+    elif flavor_id_str.strip().startswith('{'):
+        try:
+            flavor_dict = ast.literal_eval(flavor_id_str)
+            if isinstance(flavor_dict, dict) and 'id' in flavor_dict:
+                flavor_id = flavor_dict['id']
+                print(f"[INFO] Found flavor ID '{flavor_id}' by parsing dictionary output.")
+        except (ValueError, SyntaxError) as e:
+            print(f"[WARN] Could not parse flavor output as a dictionary: {e}")
+    # --- END OF MODIFIED FLAVOR LOGIC ---
 
     if image_id and "ERROR" not in image_id:
         collect_image_details(image_id, is_dependency=True, vm_id=vm_id)
@@ -200,8 +221,11 @@ def collect_image_and_flavor(vm_id):
         print("[INFO] No image ID found for this VM. Skipping image details.")
         
     if flavor_id and "ERROR" not in flavor_id:
+        print(f"[INFO] Collecting details for flavor: {flavor_id}")
         flavor, cmd_str = run_cmd(["openstack", "flavor", "show", flavor_id])
         save_text(flavor, f"{OUTPUT_DIR}/nova/flavor_show.txt", command_str=cmd_str)
+    else:
+        print("[WARN] Could not determine a valid flavor ID. Skipping flavor details.")
 
 def collect_keystone_user_info(user_id_or_name):
     os.makedirs(f"{OUTPUT_DIR}/keystone", exist_ok=True)
@@ -244,12 +268,10 @@ def collect_mysql_dump(namespace):
             return
 
         print("[INFO] Performing mysqldump of all databases from the mysql pod...")
-        # ADDED --single-transaction to avoid locking issues
         cmd_dump_str = f"kubectl exec -i deploy/mysql -c mysql -n {namespace} -- bash -l -c \"MYSQL_PWD='{db_admin_pass}' mysqldump --single-transaction --all-databases -u root\""
         
         print(f"[RUNNING] {cmd_dump_str}")
         
-        # ADDED a timeout of 30 minutes (1800 seconds)
         result = subprocess.run(cmd_dump_str, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1800)
 
         if result.returncode != 0:
