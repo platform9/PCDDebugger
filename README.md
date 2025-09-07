@@ -50,9 +50,15 @@ Make it Executable
 After downloading, rename the file for convenience and make it executable.
 
 ```
-# Example for macOSmv
-PCDdebugger-v1.0.1-macos PCDdebugger
-# Add execute permissionchmod +x PCDdebugger
+# Example for macOS
+mv PCDdebugger-v1.0.1-macos PCDdebugger
+# Add execute permission
+chmod +x PCDdebugger
+
+#Example for linux
+mv PCDdebugger-v1.0.1-linux PCDdebugger
+# Add execute permission
+chmod +x PCDdebugger
 ```
 
 (Optional) Move to Your PATH  
