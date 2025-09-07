@@ -35,46 +35,47 @@ Download the correct binary for your operating system from the latest GitHub Rel
 
 ### **macOS & Linux**
 
-1. Download the Binary  
-   From the latest release page, download the asset for your OS (e.g., PCDdebugger-v1.0.1-macos or PCDdebugger-v1.0.1-linux).  
-   Alternatively, you can use curl from your terminal with the specific version tag.  
-   Bash  
-   \# For macOS (example with v1.0.1)  
-   curl \-LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-macos
+Download the Binary  
+From the latest release page, download the asset for your OS (e.g., PCDdebugger-v1.0.1-macos or PCDdebugger-v1.0.1-linux).  
+Alternatively, you can use curl from your terminal with the specific version tag.
 
-   \# For Linux (example with v1.0.1)  
-   curl \-LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-linux
+```
+# For macOS (example with v1.0.1)curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-macos# For Linux (example with v1.0.1)
+curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-linux
+```
 
-2. Make it Executable  
-   After downloading, rename the file for convenience and make it executable.  
-   Bash  
-   \# Example for macOS  
-   mv PCDdebugger-v1.0.1-macos PCDdebugger
+Make it Executable  
+After downloading, rename the file for convenience and make it executable.
 
-   \# Add execute permission  
-   chmod \+x PCDdebugger
+```
+# Example for macOSmv PCDdebugger-v1.0.1-macos PCDdebugger# Add execute permissionchmod +x PCDdebugger
+```
 
-3. (Optional) Move to Your PATH  
-   To run PCDdebugger from any directory, move it to a location in your system's PATH.  
-   Bash  
-   sudo mv PCDdebugger /usr/local/bin/
+(Optional) Move to Your PATH  
+To run PCDdebugger from any directory, move it to a location in your system's PATH.
+
+```
+sudo mv PCDdebugger /usr/local/bin/
+```
 
 ---
 
 ### **Windows**
 
-1. **Download the Binary**  
-   Method A: Using a Web Browser  
-   From the latest release page, download the .exe asset (e.g., PCDdebugger-v1.0.1-windows.exe).  
-   Method B: Using curl (Command Line)  
-   Open Command Prompt or PowerShell and use curl to download the file. curl is included in modern versions of Windows 10 and 11\.  
-   PowerShell  
-   \# Example with v1.0.1  
-   curl \-L https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger\-v1.0.1-windows.exe \-o PCDdebugger.exe
+Download the Binary  
+Method A: Using a Web Browser  
+From the latest release page, download the .exe asset (e.g., PCDdebugger-v1.0.1-windows.exe).  
+Method B: Using curl (Command Line)  
+Open Command Prompt or PowerShell and use curl to download the file. curl is included in modern versions of Windows 10 and 11\.
 
-2. Place it in a Folder  
-   Move the downloaded PCDdebugger.exe file to a memorable location, for example, C:\\Tools\\.  
-3. (Optional) Add to PATH  
+```
+# Example with v1.0.1curl -L https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-windows.exe -o PCDdebugger.exe
+```
+
+1. Place it in a Folder  
+   Move the downloaded PCDdebugger.exe file to a memorable location, for example, C:\\Tools\\.
+
+2. (Optional) Add to PATH  
    To run the tool from any command prompt, add the folder to your system's PATH environment variable.  
    1. Search for "Edit the system environment variables" in the Start Menu.  
    2. Click the "Environment Variables..." button.  
@@ -90,9 +91,9 @@ You can now run PCDdebugger.exe from PowerShell or Command Prompt.
 
 The basic command structure is:
 
-Bash
-
-./PCDdebugger \[RESOURCE\_FLAG\] \[OPTIONS\]
+```
+./PCDdebugger [RESOURCE_FLAG] [OPTIONS]
+```
 
 *(Note: On Windows, use PCDdebugger.exe instead of ./PCDdebugger)*
 
@@ -100,44 +101,48 @@ Bash
 
 **Collect all information for a specific VM:**
 
-Bash
-
-./PCDdebugger \--vm \<VM\_ID\_OR\_NAME\>
+```
+./PCDdebugger --vm <VM_ID_OR_NAME>
+```
 
 **Collect details for a specific Glance image:**
 
-Bash
+.
 
-./PCDdebugger \--image \<IMAGE\_ID\_OR\_NAME\>
+```
+/PCDdebugger --image <IMAGE_ID_OR_NAME>
+```
 
 **Collect details for a Neutron network and its subnets:**
 
-Bash
+```
+./PCDdebugger --network <NETWORK_ID>
+```
 
-./PCDdebugger \--network \<NETWORK\_ID\>
+**Perform a MySQL dump from a Kubernetes cluster:**  
+**The \--namespace flag is required for this operation.**
 
-Perform a MySQL dump from a Kubernetes cluster:  
-The \--namespace flag is required for this operation.
-
-Bash
-
-./PCDdebugger \--mysql-dump \--namespace \<K8S\_NAMESPACE\>
+```
+./PCDdebugger --mysql-dump --namespace <K8S_NAMESPACE>
+```
 
 **Note:** For the MySQL dump to work, you must run this tool on a management cluster node and ensure your KUBECONFIG environment variable is exported correctly for that cluster.
 
 **Combine multiple flags and create a zip archive:**
 
-Bash
-
-./PCDdebugger \--vm \<VM\_ID\> \--mysql-dump \--namespace \<K8S\_NAMESPACE\> \--zip
+```
+./PCDdebugger --vm <VM_ID> --mysql-dump --namespace <K8S_NAMESPACE> --zip
+```
 
 **Specify a custom output directory and create a zip archive:**
 
-Bash
-
-./PCDdebugger \--vm \<VM\_ID\> \--output ./my-debug-session \--zip
+```
+./PCDdebugger --vm <VM_ID> --output ./my-debug-session --zip
+```
 
 ---
+
+## 
 
 ## **What It Collects**
 
@@ -163,17 +168,22 @@ All output is saved to a directory named PCDdebugger-\<TIMESTAMP\> by default.
 
 If you want to build the binary yourself, you can do so with PyInstaller.
 
-1. **Clone the repository:**  
-   Bash  
-   git clone https://github.com/platform9/PCDDebugger.git  
-   cd PCDDebugger
+Clone the repository:
 
-2. **Install dependencies:**  
-   Bash  
-   pip install pyinstaller
+```
+git clone https://github.com/platform9/PCDDebugger.gitcd PCDDebugger
+```
 
-3. **Build the binary:**  
-   Bash  
-   pyinstaller \--onefile \--name PCDdebugger pcddebugger.py
+Install dependencies:
+
+```
+pip install pyinstaller
+```
+
+Build the binary:
+
+```
+pyinstaller --onefile --name PCDdebugger pcddebugger.py
+```
 
 The final executable for your current operating system will be located in the dist/ directory.
