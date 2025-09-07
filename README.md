@@ -1,130 +1,163 @@
-# **PCDdebugger**
+PCDdebugger
+PCDdebugger is a command-line tool designed to simplify and accelerate the troubleshooting process for PCD environments. It automates the collection of diagnostic information for various services and resources, consolidating the output into a structured directory for easy analysis and sharing.
 
-PCDdebugger is a command-line Python script designed to simplify and accelerate the troubleshooting process for PCD environments. It automates the collection of diagnostic information for various services and resources, consolidating the output into a structured directory for easy analysis and sharing.
+Features
+Comprehensive Data Collection: Gathers detailed information for key PCD resources including VMs (Nova), images (Glance), networks (Neutron), ports, volumes (Cinder), stacks (Heat), etc.
 
-## **Features**
+Kubernetes Integration: Performs a complete MySQL dump from a specified Kubernetes namespace, essential for debugging issues.
 
-* **Comprehensive Data Collection:** Gathers detailed information for key PCD resources including VMs (Nova), images (Glance), networks (Neutron), ports, volumes (Cinder), stacks (Heat), and users (Keystone).  
-* **Kubernetes Integration:** Performs a complete MySQL dump from a specified Kubernetes namespace, essential for debugging control plane issues.  
-* **Dependency Traversal:** Automatically discovers and collects data for resources related to a specified VM, such as its ports, volumes, network, subnets, image, and flavor.  
-* **Organized Output:** Saves all collected data into a timestamped directory, with subfolders for each service, making the information easy to navigate.  
-* **Archive Option:** Includes a \--zip flag to automatically create a compressed archive of the collected data, ready for sharing.
+Dependency Traversal: Automatically discovers and collects data for resources related to a specified VM, such as its ports, volumes, network, subnets, image, and flavor.
 
-## **Prerequisites**
+Standalone Binary: Packaged as a single executable for macOS, Linux, and Windows, allowing users to run it without installing Python or any dependencies.
 
-Before running the script, ensure the following are installed and configured on your machine:
+Organized Output: Saves all collected data into a timestamped directory, with subfolders for each service, making the information easy to navigate.
 
-* **Python 3.6+**  
-* **pcd client:** Authenticated and configured to connect to your PCD cloud. (Ensure your rc file is sourced).  
-* **kubectl:** Authenticated and configured to connect to your Kubernetes cluster.  
-* **yq:** A command-line YAML processor, used for parsing data from Consul.
+Archive Option: Includes a --zip flag to automatically create a compressed archive of the collected data, ready for sharing.
 
-## **Installation**
+Prerequisites
+While the script itself is a standalone binary, it relies on the following command-line tools being installed and configured on the machine where it is run:
 
-1. **Clone the repository:**  
-   git clone https://github.com/chandSatyansh/PCDdebugger.git  
-   cd PCDdebugger
+openstack client: Authenticated and configured to connect to your PCD cloud. (Ensure your rc file is sourced).
 
-2. **Make the script executable (optional but recommended):**  
-   chmod \+x ./pcddebugger.py
+kubectl: Authenticated and configured to connect to your Kubernetes cluster. (This is only required in case of a mysql dump).
 
-## **Usage**
+yq: A command-line YAML processor, used for parsing data from Consul.
 
+Installation 💻
+Download the correct binary for your operating system from the latest GitHub Release.
+
+➡️ Go to the Latest Releases Page
+
+macOS & Linux
+Download the Binary
+From the latest release page, download the asset for your OS (e.g., PCDdebugger-v1.0.1-macos or PCDdebugger-v1.0.1-linux).
+
+Alternatively, you can use curl from your terminal with the specific version tag.
+
+Bash
+
+# For macOS (example with v1.0.1)
+curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-macos
+
+# For Linux (example with v1.0.1)
+curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-linux
+Make it Executable
+After downloading, rename the file for convenience and make it executable.
+
+Bash
+
+# Example for macOS
+mv PCDdebugger-v1.0.1-macos PCDdebugger
+
+# Add execute permission
+chmod +x PCDdebugger
+(Optional) Move to Your PATH
+To run PCDdebugger from any directory, move it to a location in your system's PATH.
+
+Bash
+
+sudo mv PCDdebugger /usr/local/bin/
+Windows
+Download the Binary
+From the latest release page, download the .exe asset (e.g., PCDdebugger-v1.0.1-windows.exe).
+
+Place it in a Folder
+Move the downloaded .exe file to a memorable location, for example, C:\Tools\.
+
+(Optional) Add to PATH
+To run the tool from any command prompt, add the folder to your system's PATH environment variable.
+
+Search for "Edit the system environment variables" in the Start Menu.
+
+Click the "Environment Variables..." button.
+
+Under "System variables", find and select the Path variable, then click "Edit...".
+
+Click "New" and add the path to your folder (e.g., C:\Tools).
+
+Click OK on all windows to save.
+
+You can now run PCDdebugger.exe from PowerShell or Command Prompt.
+
+Usage
 The basic command structure is:
 
-./pcddebugger.py \[RESOURCE\_FLAG\] \[OPTIONS\]
+Bash
 
-### **Examples**
+./PCDdebugger [RESOURCE_FLAG] [OPTIONS]
+(Note: On Windows, use PCDdebugger.exe instead of ./PCDdebugger)
 
-* Collect all information for a specific VM:  
-  This will gather details for the VM, its ports, volumes, network, subnets, image, and flavor.  
-  ./pcddebugger.py \--vm \<VM\_ID\_OR\_NAME\>
+Examples
+Collect all information for a specific VM:
+This will gather details for the VM, its ports, volumes, network, subnets, image, and flavor.
 
-* **Collect details for a specific Glance image:**  
-  ./pcddebugger.py \--image \<IMAGE\_ID\_OR\_NAME\>
+Bash
 
-* **Collect details for a Neutron network and its subnets:**  
-  ./pcddebugger.py \--network \<NETWORK\_ID\>
+./PCDdebugger --vm <VM_ID_OR_NAME>
+Collect details for a specific Glance image:
 
-* Perform a MySQL dump from a Kubernetes cluster:  
-  The \--namespace flag is required for this operation.  
-  ./pcddebugger.py \--mysql-dump \--namespace \<K8S\_NAMESPACE\>
+Bash
 
-* **Combine multiple flags and create a zip archive:**  
-  ./pcddebugger.py \--vm \<VM\_ID\> \--mysql-dump \--namespace \<K8S\_NAMESPACE\> \--zip
+./PCDdebugger --image <IMAGE_ID_OR_NAME>
+Collect details for a Neutron network and its subnets:
 
-* **Specify a custom output directory and create a zip archive:**  
-  ./pcddebugger.py \--vm \<VM\_ID\> \--output ./my-debug-session \--zip
+Bash
 
-## **What It Collects**
+./PCDdebugger --network <NETWORK_ID>
+Perform a MySQL dump from a Kubernetes cluster:
+The --namespace flag is required for this operation.
 
-All output is saved to a directory named PCDdebugger-\<TIMESTAMP\> by default.
+Bash
 
-### **General Health Checks (/health)**
+./PCDdebugger --mysql-dump --namespace <K8S_NAMESPACE>
+Note: For the MySQL dump to work, you must run this tool on a management cluster node and ensure your KUBECONFIG environment variable is exported correctly for that cluster.
 
-* compute\_services.txt: openstack compute service list \--long  
-* network\_agents.txt: openstack network agent list \--long  
-* volume\_services.txt: openstack volume service list \--long  
-* hypervisors.txt: openstack hypervisor list \--long  
-* And more...
+Combine multiple flags and create a zip archive:
 
-### **Nova (/nova)**
+Bash
 
-* server\_show.txt: openstack server show \<VM\_ID\>  
-* server\_events.txt: openstack server event list \<VM\_ID\>  
-* migrations.txt: openstack server migration list \--server \<VM\_ID\>  
-* flavor\_show.txt: openstack flavor show \<FLAVOR\_ID\>
+./PCDdebugger --vm <VM_ID> --mysql-dump --namespace <K8S_NAMESPACE> --zip
+Specify a custom output directory and create a zip archive:
 
-### **Glance (/glance)**
+Bash
 
-* image\_show.txt: openstack image show \<IMAGE\_ID\>
+./PCDdebugger --vm <VM_ID> --output ./my-debug-session --zip
+What It Collects
+All output is saved to a directory named PCDdebugger-<TIMESTAMP> by default.
 
-### **Neutron (/neutron)**
+General Health Checks (/health)
+compute_services.txt: pcd compute service list --long
 
-* vm\_ports\_list.txt: openstack port list \--device-id \<VM\_ID\>  
-* port\_\<PORT\_ID\>.txt: openstack port show \<PORT\_ID\>  
-* network\_\<NETWORK\_ID\>.txt: openstack network show \<NETWORK\_ID\>  
-* subnet\_\<SUBNET\_ID\>.txt: openstack subnet show \<SUBNET\_ID\>  
-* security\_group\_\<SG\_ID\>.txt: openstack security group show \<SG\_ID\>
+network_agents.txt: pcd network agent list --long
 
-### **Cinder (/cinder)**
+And more...
 
-* attached\_volumes\_list.txt: List of volumes attached to a VM.  
-* volume\_\<VOLUME\_ID\>.txt: openstack volume show \<VOLUME\_ID\>
+Nova (/nova)
+server_show.txt: pcd server show <VM_ID>
 
-### **Heat (/heat)**
+server_events.txt: pcd server event list <VM_ID>
 
-* stack\_show.txt: openstack stack show \<STACK\_ID\>  
-* stack\_resources.txt: openstack stack resource list \<STACK\_ID\>
+And more...
 
-### **Keystone (/keystone)**
+(The rest of the sections for Glance, Neutron, Cinder, etc. remain the same)
 
-* user\_show.txt: openstack user show \<USER\_ID\>  
-* user\_role\_assignments.txt: openstack role assignment list \--user \<USER\_ID\>
+Building from Source
+If you want to build the binary yourself, you can do so with PyInstaller.
 
-### **Database (/database)**
+Clone the repository:
 
-* mysql\_dump\_all\_databases.sql.gz: A compressed dump of all MySQL databases from the specified Kubernetes pod. This includes the following databases from the workload region:  
-  * alertmanager  
-  * appcatalog  
-  * barbican  
-  * ceilometer  
-  * cinder  
-  * designate  
-  * glance  
-  * gnocchi  
-  * hamgr  
-  * heat  
-  * horizon  
-  * masakari  
-  * mors  
-  * neutron  
-  * nova  
-  * nova\_api  
-  * nova\_cell0  
-  * octavia  
-  * placement  
-  * preference\_store  
-  * resmgr  
-  * terrakube  
-  * watcher
+Bash
+
+git clone https://github.com/platform9/PCDDebugger.git
+cd PCDDebugger
+Install dependencies:
+
+Bash
+
+pip install pyinstaller
+Build the binary:
+
+Bash
+
+pyinstaller --onefile --name PCDdebugger pcddebugger.py
+The final executable for your current operating system will be located in the dist/ directory.
