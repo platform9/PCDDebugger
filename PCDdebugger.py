@@ -189,22 +189,18 @@ def collect_image_details(image_id, is_dependency=False, vm_id=None):
 def collect_image_and_flavor(vm_id):
     os.makedirs(f"{OUTPUT_DIR}/nova", exist_ok=True)
     
-    # Correctly fetch image ID
     image_id_str, _ = run_cmd(["openstack", "server", "show", vm_id, "-c", "image", "-f", "value"])
     image_match = re.search(r'\(([^)]+)\)', image_id_str)
     image_id = image_match.group(1) if image_match else None
         
-    # --- START OF MODIFIED FLAVOR LOGIC ---
     print("[INFO] Attempting to determine flavor ID...")
     flavor_id = None
     flavor_id_str, _ = run_cmd(["openstack", "server", "show", vm_id, "-c", "flavor", "-f", "value"])
 
-    # Method 1: Try to find the ID in parentheses (e.g., "m1.small (flavor-id)")
     flavor_match = re.search(r'\(([^)]+)\)', flavor_id_str)
     if flavor_match:
         flavor_id = flavor_match.group(1)
         print(f"[INFO] Found flavor ID '{flavor_id}' using regex match.")
-    # Method 2: If regex fails, try to parse it as a dictionary string
     elif flavor_id_str.strip().startswith('{'):
         try:
             flavor_dict = ast.literal_eval(flavor_id_str)
@@ -213,7 +209,6 @@ def collect_image_and_flavor(vm_id):
                 print(f"[INFO] Found flavor ID '{flavor_id}' by parsing dictionary output.")
         except (ValueError, SyntaxError) as e:
             print(f"[WARN] Could not parse flavor output as a dictionary: {e}")
-    # --- END OF MODIFIED FLAVOR LOGIC ---
 
     if image_id and "ERROR" not in image_id:
         collect_image_details(image_id, is_dependency=True, vm_id=vm_id)
@@ -247,8 +242,8 @@ def archive_output():
     zip_path = shutil.make_archive(OUTPUT_DIR, 'zip', OUTPUT_DIR)
     print(f"[DONE] Output archived at: {zip_path}")
 
-def collect_mysql_dump(namespace):
-    """Connects to a k8s pod to perform a MySQL dump with a timeout."""
+def collect_mysql_dump(namespace, db_pod_label, db_service_name):
+    """Connects to a Percona HAProxy pod to perform a MySQL dump."""
     print(f"[INFO] Starting MySQL dump for namespace: {namespace}")
     os.makedirs(f"{OUTPUT_DIR}/database", exist_ok=True)
 
@@ -257,21 +252,29 @@ def collect_mysql_dump(namespace):
         cmd_get_dbserver = f'kubectl exec deploy/resmgr -c resmgr -n {namespace} -- bash -l -c "consul-dump-yaml --start-key customers/\\$CUSTOMER_ID/regions/\\$REGION_ID/db | yq -r \'.customers.[\\$CUSTOMER_ID].regions.[\\$REGION_ID].dbserver\'"'
         db_server, _ = run_cmd(cmd_get_dbserver, shell=True)
         if "ERROR" in db_server or not db_server:
-            print("[ERROR] Could not determine DB server. Aborting MySQL dump.")
+            print("[ERROR] Could not determine DB server via resmgr/consul. Aborting MySQL dump.")
             return
 
         print("[INFO] Fetching DB admin password from consul...")
         cmd_get_dbpass = f'kubectl exec deploy/resmgr -c resmgr -n {namespace} -- bash -l -c "consul-dump-yaml --start-key customers/\\$CUSTOMER_ID/dbservers/{db_server} | yq -r \'.customers.[\\$CUSTOMER_ID].dbservers.\\"{db_server}\\".admin_pass\'"'
         db_admin_pass, _ = run_cmd(cmd_get_dbpass, shell=True)
         if "ERROR" in db_admin_pass or not db_admin_pass:
-            print("[ERROR] Could not determine DB admin password. Aborting MySQL dump.")
+            print("[ERROR] Could not determine DB admin password via resmgr/consul. Aborting MySQL dump.")
             return
 
-        print("[INFO] Performing mysqldump of all databases from the mysql pod...")
-        cmd_dump_str = f"kubectl exec -i deploy/mysql -c mysql -n pf9-system -- bash -l -c \"MYSQL_PWD='{db_admin_pass}' mysqldump --single-transaction --all-databases -u root\""
+        print(f"[INFO] Finding a database pod using label: '{db_pod_label}'...")
+        cmd_get_pod = f"kubectl get pods -n {namespace} -l {db_pod_label} -o jsonpath='{{.items[0].metadata.name}}'"
+        db_pod_name, _ = run_cmd(cmd_get_pod, shell=True)
+        
+        if "ERROR" in db_pod_name or not db_pod_name:
+            print(f"[ERROR] Could not find a pod with label '{db_pod_label}' in namespace '{namespace}'. Aborting.")
+            return
+        print(f"[INFO] Found pod to connect to: {db_pod_name}")
+
+        print("[INFO] Performing mysqldump...")
+        cmd_dump_str = f"kubectl exec -i {db_pod_name} -c haproxy -n {namespace} -- bash -l -c \"MYSQL_PWD='{db_admin_pass}' mysqldump -h {db_service_name} --single-transaction --all-databases -u root\""
         
         print(f"[RUNNING] {cmd_dump_str}")
-        
         result = subprocess.run(cmd_dump_str, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1800)
 
         if result.returncode != 0:
@@ -279,9 +282,9 @@ def collect_mysql_dump(namespace):
             return
 
         if not result.stdout:
-            print("[WARN] mysqldump produced no output. The resulting file will be empty.")
+            print("[WARN] mysqldump produced no output.")
             return
-
+        
         print("[INFO] Compressing dump file...")
         dump_filename = f"{OUTPUT_DIR}/database/mysql_dump_all_databases.sql.gz"
         compressed_data = gzip.compress(result.stdout)
@@ -290,7 +293,7 @@ def collect_mysql_dump(namespace):
         print(f"[OK] MySQL dump saved to {dump_filename}")
 
     except subprocess.TimeoutExpired:
-        print("[ERROR] MySQL dump timed out after 30 minutes. The database may be too large or unresponsive.")
+        print("[ERROR] MySQL dump timed out after 30 minutes.")
     except Exception as e:
         print(f"[ERROR] An unexpected error occurred during MySQL dump: {e}")
 
@@ -309,9 +312,11 @@ def main():
     parser.add_argument("--stack", help="Heat Stack ID or Name")
     parser.add_argument("--user", help="Keystone User ID or Name")
     
-    # New MySQL/Kubernetes flag
+    # MySQL/Kubernetes flags
     parser.add_argument("--mysql-dump", action="store_true", help="Perform a MySQL dump from the k8s cluster.")
-    parser.add_argument("--namespace", help="Kubernetes namespace required for --mysql-dump.")
+    parser.add_argument("--namespace", help="Kubernetes namespace for resmgr and database.")
+    parser.add_argument("--db-pod-label", default="app.kubernetes.io/component=haproxy", help="The label to select the database proxy pod.")
+    parser.add_argument("--db-service-name", default="percona-db-pxc-db-haproxy", help="The Kubernetes service name of the database.")
 
     args = parser.parse_args()
     OUTPUT_DIR = args.output
@@ -364,7 +369,7 @@ def main():
         if not args.namespace:
             print("[ERROR] The '--namespace' argument is required when using '--mysql-dump'.")
             exit(1)
-        collect_mysql_dump(args.namespace)
+        collect_mysql_dump(args.namespace, args.db_pod_label, args.db_service_name)
 
     if args.zip:
         archive_output()
