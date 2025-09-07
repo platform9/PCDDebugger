@@ -268,7 +268,7 @@ def collect_mysql_dump(namespace):
             return
 
         print("[INFO] Performing mysqldump of all databases from the mysql pod...")
-        cmd_dump_str = f"kubectl exec -i deploy/mysql -c mysql -n {namespace} -- bash -l -c \"MYSQL_PWD='{db_admin_pass}' mysqldump --single-transaction --all-databases -u root\""
+        cmd_dump_str = f"kubectl exec -i deploy/mysql -c mysql -n pf9-system -- bash -l -c \"MYSQL_PWD='{db_admin_pass}' mysqldump --single-transaction --all-databases -u root\""
         
         print(f"[RUNNING] {cmd_dump_str}")
         
