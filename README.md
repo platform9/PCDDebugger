@@ -35,14 +35,14 @@ Download the correct binary for your operating system from the latest GitHub Rel
 ### **macOS & Linux**
 
 Download the Binary  
-From the latest release page, download the asset for your OS (e.g., PCDdebugger-v1.0.5-macos or PCDdebugger-v1.0.5-linux).  
+From the latest release page, download the asset for your OS (e.g., PCDdebugger-v2.0.0-macos or PCDdebugger-v2.0.0-linux).  
 Alternatively, you can use curl from your terminal with the specific version tag.
 
 ```
-# For macOS (example with v1.0.5)
-curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.5/PCDdebugger-v1.0.5-macos
-# For Linux (example with v1.0.5)
-curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.5/PCDdebugger-v1.0.5-linux
+# For macOS (example with v2.0.0)
+curl -LO https://github.com/platform9/PCDDebugger/releases/download/v2.0.0/PCDdebugger-v2.0.0-macos
+# For Linux (example with v2.0.0)
+curl -LO https://github.com/platform9/PCDDebugger/releases/download/v2.0.0/PCDdebugger-v2.0.0-linux
 ```
 
 Make it Executable  
@@ -50,12 +50,12 @@ After downloading, rename the file for convenience and make it executable.
 
 ```
 # Example for macOS
-mv PCDdebugger-v1.0.5-macos PCDdebugger
+mv PCDdebugger-v2.0.0-macos PCDdebugger
 # Add execute permission
 chmod +x PCDdebugger
 
 #Example for linux
-mv PCDdebugger-v1.0.5-linux PCDdebugger
+mv PCDdebugger-v2.0.0-linux PCDdebugger
 # Add execute permission
 chmod +x PCDdebugger
 ```
@@ -73,13 +73,13 @@ sudo mv PCDdebugger /usr/local/bin/
 
 Download the Binary  
 Method A: Using a Web Browser  
-From the latest release page, download the .exe asset (e.g., PCDdebugger-v1.0.5-windows.exe).  
+From the latest release page, download the .exe asset (e.g., PCDdebugger-v2.0.0-windows.exe).  
 Method B: Using curl (Command Line)  
 Open Command Prompt or PowerShell and use curl to download the file. curl is included in modern versions of Windows 10 and 11\.
 
 ```
-# Example with v1.0.5
-curl -L https://github.com/platform9/PCDDebugger/releases/download/v1.0.5/PCDdebugger-v1.0.5-windows.exe -o PCDdebugger.exe
+# Example with v2.0.0
+curl -L https://github.com/platform9/PCDDebugger/releases/download/v2.0.0/PCDdebugger-v2.0.0-windows.exe -o PCDdebugger.exe
 ```
 
 1. Place it in a Folder  
