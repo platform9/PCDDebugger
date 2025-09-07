@@ -40,22 +40,26 @@ From the latest release page, download the asset for your OS (e.g., PCDdebugger-
 Alternatively, you can use curl from your terminal with the specific version tag.
 
 ```
-# For macOS (example with v1.0.1)curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-macos# For Linux (example with v1.0.1)
-curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-linux
+# For macOS (example with v1.0.1)
+curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-macos
+# For Linux (example with v1.0.1)
+curl -LO https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-linux
 ```
 
 Make it Executable  
 After downloading, rename the file for convenience and make it executable.
 
 ```
-# Example for macOSmv PCDdebugger-v1.0.1-macos PCDdebugger# Add execute permissionchmod +x PCDdebugger
+# Example for macOSmv
+PCDdebugger-v1.0.1-macos PCDdebugger
+# Add execute permissionchmod +x PCDdebugger
 ```
 
 (Optional) Move to Your PATH  
 To run PCDdebugger from any directory, move it to a location in your system's PATH.
 
 ```
-sudo mv PCDdebugger /usr/local/bin/
+sudo mv PCDdebugger /usr/local/bin/
 ```
 
 ---
@@ -69,7 +73,8 @@ Method B: Using curl (Command Line)
 Open Command Prompt or PowerShell and use curl to download the file. curl is included in modern versions of Windows 10 and 11\.
 
 ```
-# Example with v1.0.1curl -L https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-windows.exe -o PCDdebugger.exe
+# Example with v1.0.1
+curl -L https://github.com/platform9/PCDDebugger/releases/download/v1.0.1/PCDdebugger-v1.0.1-windows.exe -o PCDdebugger.exe
 ```
 
 1. Place it in a Folder  
@@ -92,7 +97,7 @@ You can now run PCDdebugger.exe from PowerShell or Command Prompt.
 The basic command structure is:
 
 ```
-./PCDdebugger [RESOURCE_FLAG] [OPTIONS]
+./PCDdebugger [RESOURCE_FLAG] [OPTIONS]
 ```
 
 *(Note: On Windows, use PCDdebugger.exe instead of ./PCDdebugger)*
@@ -137,7 +142,7 @@ The basic command structure is:
 **Specify a custom output directory and create a zip archive:**
 
 ```
-./PCDdebugger --vm <VM_ID> --output ./my-debug-session --zip
+./PCDdebugger --vm <VM_ID> --output ./my-debug-session --zip
 ```
 
 ---
@@ -171,7 +176,8 @@ If you want to build the binary yourself, you can do so with PyInstaller.
 Clone the repository:
 
 ```
-git clone https://github.com/platform9/PCDDebugger.gitcd PCDDebugger
+git clone https://github.com/platform9/PCDDebugger.git
+cd PCDDebugger
 ```
 
 Install dependencies:
