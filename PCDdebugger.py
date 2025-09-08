@@ -13,20 +13,22 @@ import yaml
 
 DEFAULT_OUTPUT_DIR = f"PCDdebugger-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 OUTPUT_DIR = DEFAULT_OUTPUT_DIR
+USE_INSECURE = False # Will be set to True if the script is run with --insecure
 
 def run_cmd(cmd, shell=False):
-    """Runs a command, adding --insecure and --fit to openstack commands, and returns output and the command string."""
+    """Runs a command, adding --insecure (if flagged) and --max-width to openstack commands, and returns output and the command string."""
     
     # Automatically add flags to openstack commands
     if isinstance(cmd, list) and cmd[0] == "openstack":
-        # Add --insecure to bypass SSL verification if not present
-        if "--insecure" not in cmd:
+        # Add --insecure to bypass SSL verification if the script's --insecure flag is used
+        if USE_INSECURE and "--insecure" not in cmd:
             cmd.insert(1, "--insecure")
         
-        # Add --fit to list/show commands for better formatting
+        # Add --max-width to list/show commands for better formatting, unless a specific format is requested
         is_list_or_show = any(sub in ["list", "show"] for sub in cmd)
-        if is_list_or_show and "--fit" not in cmd and "--fit-width" not in cmd:
-            cmd.append("--fit")
+        is_formatted_output = any(flag in cmd for flag in ["-f", "--format"])
+        if is_list_or_show and "--max-width" not in cmd and not is_formatted_output:
+            cmd.extend(["--max-width", "170"])
             
     cmd_str = ' '.join(cmd) if isinstance(cmd, list) else cmd
     print(f"[RUNNING] {cmd_str}")
@@ -72,12 +74,13 @@ def check_openstack_auth():
 def collect_health_checks():
     os.makedirs(f"{OUTPUT_DIR}/health", exist_ok=True)
     cmds = {
-        "compute_services": ["openstack", "compute", "service", "list", "--long"],
+        "compute_services": ["openstack", "compute", "service", "list", "--long", "--timing"],
         "resource_providers": ["openstack", "resource", "provider", "list"],
         "network_agents": ["openstack", "network", "agent", "list", "--long"],
         "hypervisors": ["openstack", "hypervisor", "list", "--long"],
+        "hypervisor_stats": ["openstack", "hypervisor", "stats", "show"],
         "volume_services": ["openstack", "volume", "service", "list", "--long"],
-        "cinder_pools": ["openstack", "volume", "backend", "pool", "list"],
+        "cinder_pools": ["openstack", "volume", "backend", "pool", "list", "--long"],
     }
     for name, cmd in cmds.items():
         output, cmd_str = run_cmd(cmd)
@@ -87,6 +90,23 @@ def collect_nova_info(vm_id):
     os.makedirs(f"{OUTPUT_DIR}/nova", exist_ok=True)
     info_text, cmd_str = run_cmd(["openstack", "server", "show", vm_id])
     save_text(info_text, f"{OUTPUT_DIR}/nova/server_show.txt", command_str=cmd_str)
+    
+    # Collect hypervisor info
+    hypervisor_hostname = None
+    for line in info_text.splitlines():
+        if "OS-EXT-SRV-ATTR:hypervisor_hostname" in line:
+            parts = line.split('|')
+            if len(parts) > 2:
+                hypervisor_hostname = parts[2].strip()
+                break
+    
+    if hypervisor_hostname:
+        print(f"[INFO] Collecting details for hypervisor: {hypervisor_hostname}")
+        hypervisor_info, cmd_str_hv = run_cmd(["openstack", "hypervisor", "show", hypervisor_hostname])
+        save_text(hypervisor_info, f"{OUTPUT_DIR}/nova/hypervisor_{hypervisor_hostname}_show.txt", command_str=cmd_str_hv)
+    else:
+        print(f"[WARN] Could not find hypervisor hostname for VM {vm_id}.")
+
     events, cmd_str = run_cmd(["openstack", "server", "event", "list", vm_id])
     save_text(events, f"{OUTPUT_DIR}/nova/server_events.txt", command_str=cmd_str)
     migrations, cmd_str = run_cmd(["openstack", "server", "migration", "list", "--server", vm_id])
@@ -110,7 +130,9 @@ def collect_volumes_for_vm(vm_id):
     os.makedirs(f"{OUTPUT_DIR}/cinder", exist_ok=True)
     try:
         volumes_str, cmd_str = run_cmd(["openstack", "server", "show", vm_id, "-c", "volumes_attached", "-f", "value"])
-        if "ERROR" in volumes_str: return
+        if "ERROR" in volumes_str or not volumes_str.strip():
+            print(f"[INFO] No volumes attached to VM {vm_id}.")
+            return
         
         attached_vols = ast.literal_eval(volumes_str)
         save_text(json.dumps(attached_vols, indent=2), f"{OUTPUT_DIR}/cinder/attached_volumes_list.txt", command_str=cmd_str)
@@ -120,7 +142,7 @@ def collect_volumes_for_vm(vm_id):
             if vol_id:
                 collect_volume_details(vol_id, is_dependency=True)
     except Exception as e:
-        print(f"[WARN] Failed to collect or parse volumes for VM: {e}")
+        print(f"[WARN] Failed to collect or parse volumes for VM {vm_id}: {e}")
 
 def collect_network_info(network_id):
     print(f"[INFO] Collecting details for network: {network_id}")
@@ -133,8 +155,8 @@ def collect_network_info(network_id):
     
     print(f"[INFO] Found {len(subnet_ids_str.splitlines())} subnets for network {network_id}")
     for subnet_id in subnet_ids_str.splitlines():
-        subnet_detail, cmd_str = run_cmd(["openstack", "subnet", "show", subnet_id])
-        save_text(subnet_detail, f"{OUTPUT_DIR}/neutron/subnet_{subnet_id}.txt", command_str=cmd_str)
+        subnet_detail, cmd_str_subnet = run_cmd(["openstack", "subnet", "show", subnet_id])
+        save_text(subnet_detail, f"{OUTPUT_DIR}/neutron/subnet_{subnet_id}.txt", command_str=cmd_str_subnet)
 
 def collect_port_info(port_id, is_dependency=False):
     prefix = "vm_port" if is_dependency else "port"
@@ -149,10 +171,10 @@ def collect_port_info(port_id, is_dependency=False):
         sg_ids = ast.literal_eval(sg_ids_str)
         print(f"[INFO] Found {len(sg_ids)} security groups for port {port_id}")
         for sg_id in sg_ids:
-            sg_detail, cmd_str = run_cmd(["openstack", "security", "group", "show", sg_id])
-            save_text(sg_detail, f"{OUTPUT_DIR}/neutron/security_group_{sg_id}.txt", command_str=cmd_str)
-            sg_rules, cmd_str = run_cmd(["openstack", "security", "group", "rule", "list", sg_id])
-            save_text(sg_rules, f"{OUTPUT_DIR}/neutron/security_group_{sg_id}_rules.txt", command_str=cmd_str)
+            sg_detail, cmd_str_sg = run_cmd(["openstack", "security", "group", "show", sg_id])
+            save_text(sg_detail, f"{OUTPUT_DIR}/neutron/security_group_{sg_id}.txt", command_str=cmd_str_sg)
+            sg_rules, cmd_str_rules = run_cmd(["openstack", "security", "group", "rule", "list", sg_id])
+            save_text(sg_rules, f"{OUTPUT_DIR}/neutron/security_group_{sg_id}_rules.txt", command_str=cmd_str_rules)
     except Exception as e:
         print(f"[WARN] Could not collect security groups for port {port_id}: {e}")
 
@@ -160,8 +182,40 @@ def collect_volume_details(volume_id, is_dependency=False):
     prefix = "attached_volume" if is_dependency else "volume"
     print(f"[INFO] Collecting details for volume: {volume_id}")
     os.makedirs(f"{OUTPUT_DIR}/cinder", exist_ok=True)
-    vol_detail, cmd_str = run_cmd(["openstack", "volume", "show", volume_id])
-    save_text(vol_detail, f"{OUTPUT_DIR}/cinder/{prefix}_{volume_id}.txt", command_str=cmd_str)
+    
+    # Save the human-readable table output
+    vol_detail_table, cmd_str_table = run_cmd(["openstack", "volume", "show", volume_id])
+    save_text(vol_detail_table, f"{OUTPUT_DIR}/cinder/{prefix}_{volume_id}.txt", command_str=cmd_str_table)
+
+    # Get attachments reliably using JSON format to avoid parsing truncated table output
+    attachments_json_str, _ = run_cmd(["openstack", "volume", "show", volume_id, "-c", "attachments", "-f", "json"])
+    
+    if attachments_json_str and "ERROR" not in attachments_json_str:
+        try:
+            data = json.loads(attachments_json_str)
+            attachments = data.get("attachments", [])
+            
+            if isinstance(attachments, list):
+                for attachment in attachments:
+                    attachment_id = attachment.get("attachment_id")
+                    server_id = attachment.get("server_id")
+                    if attachment_id:
+                        print(f"[INFO] Collecting details for volume attachment: {attachment_id} (VM: {server_id})")
+                        # CORRECTED COMMAND: Removed the invalid "--volume" argument
+                        attachment_detail, cmd_str_attach = run_cmd(["openstack", "volume", "attachment", "show", attachment_id])
+                        save_text(attachment_detail, f"{OUTPUT_DIR}/cinder/volume_{volume_id}_attachment_{attachment_id}.txt", command_str=cmd_str_attach)
+                    
+                    # If called via --volume, also grab details for the attached VM
+                    if server_id and not is_dependency:
+                        print(f"[INFO] Volume {volume_id} is attached to VM {server_id}. Collecting related VM info...")
+                        collect_nova_info(server_id)
+                        collect_ports_for_vm(server_id)
+
+        except json.JSONDecodeError as e:
+            print(f"[WARN] Could not parse JSON attachments for volume {volume_id}: {e}")
+    else:
+        print(f"[INFO] No attachment information found for volume {volume_id}.")
+
 
 def collect_stack_info(stack_id):
     os.makedirs(f"{OUTPUT_DIR}/heat", exist_ok=True)
@@ -175,8 +229,8 @@ def collect_stack_info(stack_id):
     if "ERROR" in resource_names_str: return
     
     for res_name in resource_names_str.splitlines():
-        res_show, cmd_str = run_cmd(["openstack", "stack", "resource", "show", stack_id, res_name])
-        save_text(res_show, f"{OUTPUT_DIR}/heat/resource_{res_name}.txt", command_str=cmd_str)
+        res_show, cmd_str_res = run_cmd(["openstack", "stack", "resource", "show", stack_id, res_name])
+        save_text(res_show, f"{OUTPUT_DIR}/heat/resource_{res_name}.txt", command_str=cmd_str_res)
 
 def collect_image_details(image_id, is_dependency=False, vm_id=None):
     """Collects details for a specific Glance image."""
@@ -227,8 +281,8 @@ def collect_keystone_user_info(user_id_or_name):
     os.makedirs(f"{OUTPUT_DIR}/keystone", exist_ok=True)
     user_info, cmd_str = run_cmd(["openstack", "user", "show", user_id_or_name])
     save_text(user_info, f"{OUTPUT_DIR}/keystone/user_show.txt", command_str=cmd_str)
-    role_assignments, cmd_str = run_cmd(["openstack", "role", "assignment", "list", "--user", user_id_or_name, "--names"])
-    save_text(role_assignments, f"{OUTPUT_DIR}/keystone/user_role_assignments.txt", command_str=cmd_str)
+    role_assignments, cmd_str_roles = run_cmd(["openstack", "role", "assignment", "list", "--user", user_id_or_name, "--names"])
+    save_text(role_assignments, f"{OUTPUT_DIR}/keystone/user_role_assignments.txt", command_str=cmd_str_roles)
 
 def collect_quota_info(project_id):
     if not project_id:
@@ -317,10 +371,11 @@ def collect_mysql_dump(namespace, db_pod_label, db_service_name):
         print(f"[ERROR] An unexpected error occurred: {e}")
 
 def main():
-    global OUTPUT_DIR
+    global OUTPUT_DIR, USE_INSECURE
     parser = argparse.ArgumentParser(description="Cloud Debug Collector")
     parser.add_argument("--output", default=DEFAULT_OUTPUT_DIR, help="Output directory")
     parser.add_argument("--zip", action="store_true", help="Zip output")
+    parser.add_argument("--insecure", action="store_true", help="Bypass SSL verification for OpenStack commands.")
 
     # OpenStack flags
     parser.add_argument("--vm", help="VM ID or Name")
@@ -339,6 +394,7 @@ def main():
 
     args = parser.parse_args()
     OUTPUT_DIR = args.output
+    USE_INSECURE = args.insecure
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     is_openstack_command = any([args.vm, args.image, args.network, args.port, args.volume, args.stack, args.user])
